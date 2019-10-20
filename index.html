@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <script type="text/javascript" src="lib/dygraph.min.js"></script>
+    <link rel="stylesheet" href="lib/bootstrap.min.css" />
+    <link rel="stylesheet" href="lib/dygraph.css" />
+</head>
+
+<body style="font-family: Helvetica, Arial, sans-serif;">
+    <h1 style="text-align: center;">Simple and fast garbage collector log
+        analyzer</h1>
+
+
+    <input type="file" id="files" name="files[]" multiple style="visibility: hidden" />
+    <div style="text-align: center; margin:10px; padding-bottom: 10px;">
+        <label for="files" style="cursor: pointer; background-color: black; color: white; padding: 10px;">Open GC log
+            file</label>
+    </div>
+    <div style="margin: 15px;" >
+    <div class="row" style="margin: 0;">
+        <div id="graphdiv" style="padding: 0; height: 400px;" class="col-lg-4 col-sm-6 col-xs-12"></div>
+        <div id="graphdiv2" style="padding: 0; height: 400px;" class="col-lg-4 col-sm-6 col-xs-12"></div>
+    </div>
+</div>
+
+    <script>
+
+        function parseType(line) {
+            if (line.startsWith("Pause Young", 51)) {
+                return "YOUNG";
+            } else if (line.startsWith("Pause Full", 51)) {
+                return "FULL";
+            } else {
+                return "NONE";
+            }
+        }
+
+        function parseMem(memPart) {
+            var split = memPart.split("->");
+            var before = parseInt(split[0]);
+            split = split[1].split("(");
+            var after = parseInt(split[0]);
+            var limit = parseInt(split[1]);
+            return { before: before, after: after, limit: limit };
+        }
+
+        function parseLines(lines) {
+            var timesSeries = [];
+            var memSeries = [];
+            lines.forEach(function (line) {
+                // filter bad lines
+                if (line.length < 90) return;
+                var type = parseType(line);
+                if (type == "NONE") return;
+
+                var time = new Date(line.substring(1, 29));
+                var split = line.split(" ");
+                var dur = parseFloat(split[split.length - 1]);
+                var mem = parseMem(split[split.length - 2]);
+                memSeries.push([time, mem.before, mem.after, mem.limit]);
+                if (type == "YOUNG") {
+                    timesSeries.push([time, dur, NaN]);
+                } else {
+                    timesSeries.push([time, NaN, dur]);
+                }
+            })
+            return { mem: memSeries, times: timesSeries };
+        }
+
+        function handleFileSelect(evt) {
+            var files = evt.target.files; // FileList object
+
+            // files is a FileList of File objects. List some properties.
+            var output = [];
+            var reader = new FileReader();
+            f = files[0];
+            output.push('<li><strong>', escape(f.name), '</strong></li>');
+            reader.onload = function (e) {
+                var content = e.target.result;
+                var startTime = new Date();
+                var lines = content.split(/\r?\n/);
+                var series = parseLines(lines);
+                console.log("Log parsing took ms: ", new Date() - startTime);
+                g = new Dygraph(document.getElementById("graphdiv"), series.times,
+                    {
+                        labels: ["time", "Young", "Full"],
+                        title: "GC time",
+                        legend: 'always',
+                    });
+                g = new Dygraph(document.getElementById("graphdiv2"), series.mem,
+                    {
+                        labels: ["time", "Before", "After", "Limit"],
+                        title: "Memory",
+                        legend: 'always',
+                    });
+            };
+            reader.readAsText(f);
+        }
+
+        document.getElementById('files').addEventListener('change', handleFileSelect, false);
+    </script>
+</body>
+
+</html>
