@@ -27,9 +27,9 @@
     <script>
 
         function parseType(line) {
-            if (line.startsWith("Pause Young", 51)) {
+            if (line.includes("Pause Young")) {
                 return "YOUNG";
-            } else if (line.startsWith("Pause Full", 51)) {
+            } else if (line.includes("Pause Full")) {
                 return "FULL";
             } else {
                 return "NONE";
@@ -48,7 +48,9 @@
         function parseLines(lines) {
             var timesSeries = [];
             var memSeries = [];
+            var count = 0;
             lines.forEach(function (line) {
+                count++;
                 // filter bad lines
                 if (line.length < 90) return;
                 var type = parseType(line);
@@ -65,6 +67,8 @@
                     timesSeries.push([time, NaN, dur]);
                 }
             })
+            console.log("COUNT: " + count);
+            console.log(timesSeries.length);
             return { mem: memSeries, times: timesSeries };
         }
 
